@@ -42,7 +42,7 @@ public class AccountController {
     }
 
     @PostMapping("/users/{userId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'CUSTOMER')")
     public ResponseEntity<ApiResponse<AccountResponseDto>> create(@PathVariable Long userId) {
         return ResponseEntity.ok(ApiResponse.success("Create account successfully", accountService.createAccount(userId)));
     }

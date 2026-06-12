@@ -28,8 +28,17 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         String token = resolveToken(request);
 
+        boolean isBlacklisted = false;
+        if (StringUtils.hasText(token)) {
+            try {
+                isBlacklisted = Boolean.TRUE.equals(stringRedisTemplate.hasKey("blacklist:" + token));
+            } catch (Exception e) {
+                System.err.println("Redis connection failed in JwtAuthFilter: " + e.getMessage() + ". Bypassing blacklist check.");
+            }
+        }
+
         if (StringUtils.hasText(token)
-                && !Boolean.TRUE.equals(stringRedisTemplate.hasKey("blacklist:" + token))
+                && !isBlacklisted
                 && SecurityContextHolder.getContext().getAuthentication() == null) {
             String username = jwtService.extractUsername(token);
             UserDetails userDetails = userDetailsService.loadUserByUsername(username);
