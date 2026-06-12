@@ -38,8 +38,14 @@ public class Transaction {
     private Account fromAccount;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "to_account_id", nullable = false)
+    @JoinColumn(name = "to_account_id", nullable = true)
     private Account toAccount;
+
+    @Column(name = "external_account_number")
+    private String externalAccountNumber;
+
+    @Column(name = "external_bank_name")
+    private String externalBankName;
 
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal amount;

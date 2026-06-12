@@ -1,11 +1,9 @@
 package com.rikkeisoft.bank.aspect;
 
 import lombok.extern.slf4j.Slf4j;
-import org.aspectj.lang.JoinPoint;
-import org.aspectj.lang.annotation.AfterReturning;
-import org.aspectj.lang.annotation.AfterThrowing;
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
-import org.aspectj.lang.annotation.Before;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -13,18 +11,20 @@ import org.springframework.stereotype.Component;
 @Component
 public class LoggingAspect {
 
-    @Before("execution(* com.rikkeisoft.bank.service..*(..))")
-    public void beforeService(JoinPoint joinPoint) {
-        log.info("Start {}", joinPoint.getSignature().toShortString());
-    }
-
-    @AfterReturning("execution(* com.rikkeisoft.bank.service..*(..))")
-    public void afterService(JoinPoint joinPoint) {
-        log.info("Success {}", joinPoint.getSignature().toShortString());
-    }
-
-    @AfterThrowing(pointcut = "execution(* com.rikkeisoft.bank.service..*(..))", throwing = "ex")
-    public void afterThrowing(JoinPoint joinPoint, Throwable ex) {
-        log.error("Error {}: {}", joinPoint.getSignature().toShortString(), ex.getMessage());
+    @Around("execution(* com.rikkeisoft.bank.service..*(..))")
+    public Object logExecutionTime(ProceedingJoinPoint joinPoint) throws Throwable {
+        long startTime = System.currentTimeMillis();
+        String methodName = joinPoint.getSignature().toShortString();
+        log.info("Start {}", methodName);
+        try {
+            Object result = joinPoint.proceed();
+            long duration = System.currentTimeMillis() - startTime;
+            log.info("Success {} in {} ms", methodName, duration);
+            return result;
+        } catch (Throwable ex) {
+            long duration = System.currentTimeMillis() - startTime;
+            log.error("Error {} in {} ms: {}", methodName, duration, ex.getMessage());
+            throw ex;
+        }
     }
 }

@@ -5,6 +5,7 @@ import com.rikkeisoft.bank.entity.KycProfile;
 import com.rikkeisoft.bank.entity.User;
 import com.rikkeisoft.bank.enums.Status;
 import com.rikkeisoft.bank.repository.KycProfileRepository;
+import com.rikkeisoft.bank.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ import java.util.UUID;
 public class KycService {
     private final Cloudinary cloudinary;
     private final UserService userService;
+    private final UserRepository userRepository;
     private final KycProfileRepository kycProfileRepository;
 
     @Value("${cloudinary.cloud-name}")
@@ -49,20 +51,45 @@ public class KycService {
         return kycProfileRepository.save(profile);
     }
 
-    private String upload(MultipartFile file) throws IOException {
-        if ("your-cloud-name".equals(cloudName) || cloudName == null || cloudName.isBlank()) {
-            // Local fallback if Cloudinary credentials are not configured
-            String fileName = UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
-            File uploadDir = new File("uploads").getAbsoluteFile();
-            if (!uploadDir.exists()) {
-                uploadDir.mkdirs();
-            }
-            File dest = new File(uploadDir, fileName);
-            file.transferTo(dest);
-            return "/uploads/" + fileName;
+    @Transactional
+    public KycProfile verifyKyc(Long id, Status status) {
+        KycProfile profile = kycProfileRepository.findById(id)
+                .orElseThrow(() -> new com.rikkeisoft.bank.exception.ResourceNotFoundException("KYC Profile not found with id: " + id));
+
+        profile.setStatus(status);
+        profile.setVerifiedAt(LocalDateTime.now());
+
+        // Update the associated User's isKyc field
+        User user = profile.getUser();
+        if (user != null) {
+            user.setKyc(status == Status.CONFIRM);
+            userRepository.save(user);
         }
 
-        Map<?, ?> result = cloudinary.uploader().upload(file.getBytes(), Map.of("folder", "rikkei-bank/ekyc"));
-        return result.get("secure_url").toString();
+        return kycProfileRepository.save(profile);
+    }
+
+    private String upload(MultipartFile file) throws IOException {
+        try {
+            if ("your-cloud-name".equals(cloudName) || cloudName == null || cloudName.isBlank()) {
+                return uploadLocally(file);
+            }
+            Map<?, ?> result = cloudinary.uploader().upload(file.getBytes(), Map.of("folder", "rikkei-bank/ekyc"));
+            return result.get("secure_url").toString();
+        } catch (Exception e) {
+            System.err.println("Cloudinary upload failed: " + e.getMessage() + ". Falling back to local upload.");
+            return uploadLocally(file);
+        }
+    }
+
+    private String uploadLocally(MultipartFile file) throws IOException {
+        String fileName = UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
+        File uploadDir = new File("uploads").getAbsoluteFile();
+        if (!uploadDir.exists()) {
+            uploadDir.mkdirs();
+        }
+        File dest = new File(uploadDir, fileName);
+        file.transferTo(dest);
+        return "/uploads/" + fileName;
     }
 }

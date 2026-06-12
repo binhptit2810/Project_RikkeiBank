@@ -15,6 +15,8 @@ public class TransactionResponseDto {
     private String transactionCode;
     private String fromAccountNumber;
     private String toAccountNumber;
+    private String externalAccountNumber;
+    private String externalBankName;
     private BigDecimal amount;
     private String description;
     private String status;

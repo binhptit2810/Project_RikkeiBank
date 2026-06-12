@@ -1,18 +1,21 @@
 package com.rikkeisoft.bank.service;
 
 import com.rikkeisoft.bank.dto.request.TransferRequest;
+import com.rikkeisoft.bank.dto.request.InterbankTransferRequest;
 import com.rikkeisoft.bank.dto.response.TransactionResponseDto;
 import com.rikkeisoft.bank.entity.Account;
 import com.rikkeisoft.bank.entity.Transaction;
 import com.rikkeisoft.bank.exception.InsufficientBalanceException;
 import com.rikkeisoft.bank.repository.AccountRepository;
 import com.rikkeisoft.bank.repository.TransactionRepository;
+import com.rikkeisoft.bank.mapper.TransactionMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -21,11 +24,23 @@ public class TransactionService {
     private final AccountService accountService;
     private final AccountRepository accountRepository;
     private final TransactionRepository transactionRepository;
+    private final TransactionMapper transactionMapper;
 
     @Transactional
     public TransactionResponseDto transfer(TransferRequest request) {
+        if (request.getFromAccountNumber().equals(request.getToAccountNumber())) {
+            throw new IllegalArgumentException("Source and destination accounts must be different");
+        }
+
         Account fromAccount = accountService.findByAccountNumber(request.getFromAccountNumber());
         Account toAccount = accountService.findByAccountNumber(request.getToAccountNumber());
+
+        if (!fromAccount.isActive()) {
+            throw new IllegalArgumentException("Source account is inactive");
+        }
+        if (!toAccount.isActive()) {
+            throw new IllegalArgumentException("Destination account is inactive");
+        }
 
         if (fromAccount.getBalance().compareTo(request.getAmount()) < 0) {
             throw new InsufficientBalanceException("Insufficient balance");
@@ -50,24 +65,52 @@ public class TransactionService {
         return toDto(transactionRepository.save(transaction));
     }
 
-    public List<TransactionResponseDto> history(String accountNumber) {
-        return transactionRepository
-                .findByFromAccountAccountNumberOrToAccountAccountNumberOrderByCreatedAtDesc(accountNumber, accountNumber)
-                .stream()
-                .map(this::toDto)
-                .toList();
+    @Transactional
+    public TransactionResponseDto interbankTransfer(InterbankTransferRequest request) {
+        Account fromAccount = accountService.findByAccountNumber(request.getFromAccountNumber());
+
+        // Verify transaction PIN
+        if (fromAccount.getTransactionPin() == null || !fromAccount.getTransactionPin().equals(request.getTransactionPin())) {
+            throw new IllegalArgumentException("Incorrect transaction PIN");
+        }
+
+        // Verify active state
+        if (!fromAccount.isActive()) {
+            throw new IllegalArgumentException("Source account is inactive");
+        }
+
+        // Verify balance
+        if (fromAccount.getBalance().compareTo(request.getAmount()) < 0) {
+            throw new InsufficientBalanceException("Insufficient balance");
+        }
+
+        fromAccount.setBalance(fromAccount.getBalance().subtract(request.getAmount()));
+        accountRepository.save(fromAccount);
+
+        String transactionCode = "TX" + UUID.randomUUID().toString().replace("-", "").substring(0, 10).toUpperCase();
+
+        Transaction transaction = Transaction.builder()
+                .transactionCode(transactionCode)
+                .fromAccount(fromAccount)
+                .toAccount(null)
+                .externalAccountNumber(request.getToAccountNumber())
+                .externalBankName(request.getBankName())
+                .amount(request.getAmount())
+                .description(request.getDescription())
+                .status("SUCCESS")
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        return toDto(transactionRepository.save(transaction));
     }
 
-    private TransactionResponseDto toDto(Transaction transaction) {
-        return TransactionResponseDto.builder()
-                .id(transaction.getId())
-                .transactionCode(transaction.getTransactionCode())
-                .fromAccountNumber(transaction.getFromAccount().getAccountNumber())
-                .toAccountNumber(transaction.getToAccount().getAccountNumber())
-                .amount(transaction.getAmount())
-                .description(transaction.getDescription())
-                .status(transaction.getStatus())
-                .createdAt(transaction.getCreatedAt())
-                .build();
+    public Page<TransactionResponseDto> history(String accountNumber, Pageable pageable) {
+        return transactionRepository
+                .findByFromAccountAccountNumberOrToAccountAccountNumberOrderByCreatedAtDesc(accountNumber, accountNumber, pageable)
+                .map(this::toDto);
+    }
+
+    public TransactionResponseDto toDto(Transaction transaction) {
+        return transactionMapper.toDto(transaction);
     }
 }

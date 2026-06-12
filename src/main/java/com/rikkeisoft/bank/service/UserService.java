@@ -5,6 +5,7 @@ import com.rikkeisoft.bank.dto.response.UserResponseDto;
 import com.rikkeisoft.bank.entity.User;
 import com.rikkeisoft.bank.exception.ResourceNotFoundException;
 import com.rikkeisoft.bank.repository.UserRepository;
+import com.rikkeisoft.bank.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final UserMapper userMapper;
 
     public UserResponseDto getById(Long id) {
         return toDto(findEntityById(id));
@@ -76,13 +78,6 @@ public class UserService {
     }
 
     public UserResponseDto toDto(User user) {
-        return UserResponseDto.builder()
-                .id(user.getId())
-                .fullName(user.getKycProfile() != null ? user.getKycProfile().getFullName() : null)
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .phoneNumber(user.getPhoneNumber())
-                .role(user.getRole().getName())
-                .build();
+        return userMapper.toDto(user);
     }
 }

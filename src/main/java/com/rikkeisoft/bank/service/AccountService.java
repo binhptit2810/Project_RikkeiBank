@@ -1,11 +1,13 @@
 package com.rikkeisoft.bank.service;
 
 import com.rikkeisoft.bank.dto.request.AccountUpdateRequest;
+import com.rikkeisoft.bank.dto.request.ChangePinRequest;
 import com.rikkeisoft.bank.dto.response.AccountResponseDto;
 import com.rikkeisoft.bank.dto.response.BalanceResponseDto;
 import com.rikkeisoft.bank.entity.Account;
 import com.rikkeisoft.bank.entity.User;
 import com.rikkeisoft.bank.exception.ResourceNotFoundException;
+import com.rikkeisoft.bank.mapper.AccountMapper;
 import com.rikkeisoft.bank.repository.AccountRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -23,6 +25,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class AccountService {
     private final AccountRepository accountRepository;
     private final UserService userService;
+    private final AccountMapper accountMapper;
 
     @Transactional
     public AccountResponseDto createAccount(Long userId) {
@@ -68,6 +71,19 @@ public class AccountService {
     }
 
     @Transactional
+    public AccountResponseDto changePin(String accountNumber, ChangePinRequest request) {
+        Account account = findByAccountNumber(accountNumber);
+        if (request.getOldPin() != null && !request.getOldPin().isBlank()) {
+            if (account.getTransactionPin() == null || !account.getTransactionPin().equals(request.getOldPin())) {
+                throw new IllegalArgumentException("Incorrect old transaction PIN");
+            }
+        }
+        account.setTransactionPin(request.getNewPin());
+        account.setUpdatedAt(LocalDateTime.now());
+        return toDto(accountRepository.save(account));
+    }
+
+    @Transactional
     public void deleteAccount(Long id) {
         if (!accountRepository.existsById(id)) {
             throw new ResourceNotFoundException("Account not found with id: " + id);
@@ -87,13 +103,7 @@ public class AccountService {
     }
 
     public AccountResponseDto toDto(Account account) {
-        return AccountResponseDto.builder()
-                .id(account.getId())
-                .accountNumber(account.getAccountNumber())
-                .balance(account.getBalance())
-                .currency(account.getCurrency())
-                .active(account.isActive())
-                .build();
+        return accountMapper.toDto(account);
     }
 
     private String generateAccountNumber() {

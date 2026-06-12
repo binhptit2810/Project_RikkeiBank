@@ -1,6 +1,6 @@
 package com.rikkeisoft.bank.security;
 
-import com.rikkeisoft.bank.repository.TokenBlackListRepository;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,7 +21,7 @@ import java.io.IOException;
 public class JwtAuthFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final UserDetailsServiceImpl userDetailsService;
-    private final TokenBlackListRepository tokenBlackListRepository;
+    private final StringRedisTemplate stringRedisTemplate;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -29,7 +29,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String token = resolveToken(request);
 
         if (StringUtils.hasText(token)
-                && !tokenBlackListRepository.existsByAccessToken(token)
+                && !Boolean.TRUE.equals(stringRedisTemplate.hasKey("blacklist:" + token))
                 && SecurityContextHolder.getContext().getAuthentication() == null) {
             String username = jwtService.extractUsername(token);
             UserDetails userDetails = userDetailsService.loadUserByUsername(username);
