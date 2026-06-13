@@ -161,7 +161,7 @@ public class AuthService {
                 stringRedisTemplate.opsForValue().set("blacklist:" + token, "true", 60, TimeUnit.SECONDS);
             }
         } catch (Exception e) {
-            stringRedisTemplate.opsForValue().set("blacklist:" + token, "true", 3600, TimeUnit.SECONDS);
+            System.err.println("Redis connection failed in AuthService.logout: " + e.getMessage() + ". Bypassing Redis blacklist write.");
         }
 
         try {
