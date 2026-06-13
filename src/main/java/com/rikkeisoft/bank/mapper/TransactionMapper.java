@@ -9,5 +9,6 @@ import org.mapstruct.Mapping;
 public interface TransactionMapper {
     @Mapping(target = "fromAccountNumber", source = "fromAccount.accountNumber")
     @Mapping(target = "toAccountNumber", source = "toAccount.accountNumber")
+    @Mapping(target = "transactionType", ignore = true)
     TransactionResponseDto toDto(Transaction transaction);
 }

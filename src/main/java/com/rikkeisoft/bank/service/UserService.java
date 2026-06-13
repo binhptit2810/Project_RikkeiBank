@@ -39,7 +39,7 @@ public class UserService {
     }
 
     public Page<UserResponseDto> getAll(Pageable pageable) {
-        return userRepository.findAll(pageable).map(this::toDto);
+        return userRepository.findAllProjected(pageable);
     }
 
     @Transactional

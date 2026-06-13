@@ -107,7 +107,17 @@ public class TransactionService {
     public Page<TransactionResponseDto> history(String accountNumber, Pageable pageable) {
         return transactionRepository
                 .findByFromAccountAccountNumberOrToAccountAccountNumberOrderByCreatedAtDesc(accountNumber, accountNumber, pageable)
-                .map(this::toDto);
+                .map(transaction -> {
+                    TransactionResponseDto dto = toDto(transaction);
+                    if (transaction.getFromAccount() != null && accountNumber.equals(transaction.getFromAccount().getAccountNumber())) {
+                        dto.setTransactionType("DEBIT");
+                    } else if (transaction.getToAccount() != null && accountNumber.equals(transaction.getToAccount().getAccountNumber())) {
+                        dto.setTransactionType("CREDIT");
+                    } else {
+                        dto.setTransactionType("DEBIT");
+                    }
+                    return dto;
+                });
     }
 
     public TransactionResponseDto toDto(Transaction transaction) {
